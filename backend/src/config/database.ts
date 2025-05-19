@@ -1,32 +1,31 @@
-import { Pool, PoolConfig } from 'pg';
+import { Pool } from 'pg';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
-const dbConfig: PoolConfig = {
-  user: process.env.DB_USER,
-  host: process.env.DB_HOST,
-  database: process.env.DB_NAME,
-  password: process.env.DB_PASSWORD,
-  port: parseInt(process.env.DB_PORT || '5432'),
-  // Connection pool settings
-  max: 20, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000, // How long a client is allowed to remain idle before being closed
-  connectionTimeoutMillis: 2000, // How long to wait for a connection
-};
+const isTest = process.env.NODE_ENV === 'test';
+const databaseUrl = isTest ? process.env.DATABASE_TEST_URL : process.env.DATABASE_URL;
 
-// Create a new pool instance
-const pool = new Pool(dbConfig);
+if (!databaseUrl) {
+  throw new Error('DATABASE_URL environment variable is not set');
+}
+
+export const pool = new Pool({
+  connectionString: databaseUrl,
+});
+
+// For migrations
+export const getDbConfig = () => ({
+  connectionString: databaseUrl,
+});
 
 // Test the connection
-pool.on('connect', () => {
-  console.log('Connected to PostgreSQL database');
-});
-
-pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
-  process.exit(-1);
-});
+pool.connect()
+  .then(() => console.log('Successfully connected to database'))
+  .catch((err) => {
+    console.error('Error connecting to database:', err);
+    process.exit(1);
+  });
 
 // Helper function to test the connection
 export const testConnection = async (): Promise<boolean> => {

@@ -3,11 +3,13 @@ import cors from 'cors';
 import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { testConnection } from './config/database';
+import router from './routes';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 
 // Load environment variables
 dotenv.config();
 
-const app = express();
+export const app = express();
 const port = process.env.PORT || 3001;
 
 // Middleware
@@ -24,6 +26,13 @@ app.get('/health', async (req, res) => {
     database: dbStatus ? 'connected' : 'disconnected'
   });
 });
+
+// API routes
+app.use('/api/v1', router);
+
+// Error handling
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 // Start server
 const startServer = async () => {
