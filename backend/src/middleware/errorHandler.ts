@@ -1,61 +1,27 @@
-import { Request, Response, NextFunction, ErrorRequestHandler } from 'express';
+import { Request, Response, NextFunction } from 'express';
+import { ApiError, ErrorCodes } from '../types/errors';
 
-// Custom error class for API errors
-export class ApiError extends Error {
-  constructor(
-    public statusCode: number,
-    public code: string,
-    message: string,
-    public details?: any
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
-
-// Error handler middleware
-export const errorHandler: ErrorRequestHandler = (
-  err: Error,
+export const errorHandler = (
+  error: Error,
   req: Request,
   res: Response,
   next: NextFunction
 ) => {
-  console.error('Error:', err);
-
-  if (err instanceof ApiError) {
-    res.status(err.statusCode).json({
-      error: err.message,
-      code: err.code,
-      details: err.details
+  if (error instanceof ApiError) {
+    return res.status(error.statusCode).json({
+      error: {
+        code: error.code,
+        message: error.message
+      }
     });
-    return;
   }
 
-  // Handle database errors
-  if (err.name === 'PostgresError') {
-    res.status(500).json({
-      error: 'Database error occurred',
-      code: 'DATABASE_ERROR',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
-    return;
-  }
-
-  // Handle validation errors (from express-validator)
-  if (err.name === 'ValidationError') {
-    res.status(400).json({
-      error: 'Validation failed',
-      code: 'VALIDATION_ERROR',
-      details: err.message
-    });
-    return;
-  }
-
-  // Handle unknown errors
-  res.status(500).json({
-    error: 'Internal server error',
-    code: 'INTERNAL_ERROR',
-    details: process.env.NODE_ENV === 'development' ? err.message : undefined
+  console.error('Unhandled error:', error);
+  return res.status(500).json({
+    error: {
+      code: ErrorCodes.INTERNAL_ERROR,
+      message: 'An unexpected error occurred'
+    }
   });
 };
 
