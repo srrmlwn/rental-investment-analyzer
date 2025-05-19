@@ -1,0 +1,10 @@
+{
+  "dev": {
+    "driver": "pg",
+    "connectionString": "postgres://localhost:5432/rental_analyzer"
+  },
+  "test": {
+    "driver": "pg",
+    "connectionString": "postgres://localhost:5432/rental_analyzer_test"
+  }
+} 
