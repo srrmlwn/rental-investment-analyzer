@@ -1,59 +1,58 @@
-import axios, { AxiosInstance } from 'axios';
+import axios from 'axios';
 import { Property } from '../models/types';
 import { LocationRepository } from '../repositories/locationRepository';
 import { PropertyRepository } from '../repositories/propertyRepository';
 
 export interface SearchParams {
   city?: string;
-  zipCodes?: string[];
+  state?: string;
+  zipCode?: string;
   minPrice?: number;
   maxPrice?: number;
-  bedrooms?: number;
   propertyType?: string;
+  bedsMin?: number;
+  bathsMin?: number;
 }
 
-export interface PropertyListingService {
-  searchProperties(params: SearchParams): Promise<Property[]>;
-}
-
-export class RapidAPIPropertyService implements PropertyListingService {
-  private readonly api: AxiosInstance;
+export class PropertyListingService {
+  private apiKey: string;
+  private baseUrl: string;
   private readonly locationRepo: LocationRepository;
   private readonly propertyRepo: PropertyRepository;
 
-  constructor(apiKey: string, baseUrl: string) {
-    this.api = axios.create({
-      baseURL: baseUrl,
-      headers: {
-        'X-RapidAPI-Key': apiKey,
-        'X-RapidAPI-Host': new URL(baseUrl).host,
-      },
-    });
+  constructor() {
+    this.apiKey = process.env.RAPIDAPI_KEY || '';
+    this.baseUrl = 'https://realty-in-us.p.rapidapi.com/properties/v3';
     this.locationRepo = new LocationRepository();
     this.propertyRepo = new PropertyRepository();
   }
 
   async searchProperties(params: SearchParams): Promise<Property[]> {
     try {
-      // 1. Get or create location
-      const location = await this.getOrCreateLocation(params);
-
-      // 2. Search properties from RapidAPI
-      const response = await this.api.get('/properties/search', {
+      const response = await axios.get(`${this.baseUrl}/list`, {
+        headers: {
+          'X-RapidAPI-Key': this.apiKey,
+          'X-RapidAPI-Host': 'realty-in-us.p.rapidapi.com'
+        },
         params: {
           city: params.city,
-          zipCode: params.zipCodes?.join(','),
-          minPrice: params.minPrice,
-          maxPrice: params.maxPrice,
-          beds: params.bedrooms,
-          propertyType: params.propertyType,
-        },
+          state_code: params.state,
+          postal_code: params.zipCode,
+          price_min: params.minPrice,
+          price_max: params.maxPrice,
+          property_type: params.propertyType,
+          beds_min: params.bedsMin,
+          baths_min: params.bathsMin
+        }
       });
 
-      // 3. Transform and save properties
+      if (!response.data?.data?.home_search?.results) {
+        return [];
+      }
+
       const properties = await Promise.all(
-        response.data.properties.map(async (apiProperty: any) => {
-          const property = this.transformApiProperty(apiProperty, location.id);
+        response.data.data.home_search.results.map(async (apiProperty: any) => {
+          const property = this.transformPropertyData(apiProperty);
           return this.propertyRepo.create(property);
         })
       );
@@ -61,42 +60,62 @@ export class RapidAPIPropertyService implements PropertyListingService {
       return properties;
     } catch (error) {
       console.error('Error searching properties:', error);
-      throw new Error('Failed to search properties');
+      return [];
     }
   }
 
-  private async getOrCreateLocation(params: SearchParams): Promise<{ id: number }> {
-    if (!params.city) {
-      throw new Error('City is required for property search');
-    }
-
-    // For now, we'll use a default state if not provided
-    const state = 'CA'; // TODO: Make this configurable or get from params
-
-    let location = await this.locationRepo.findByCityState(params.city, state);
-    if (!location) {
-      location = await this.locationRepo.create({
-        city: params.city,
-        state,
-        zipCode: params.zipCodes?.[0], // Use first zip code if available
+  async getPropertyById(propertyId: string): Promise<Property | null> {
+    try {
+      const response = await axios.get(`${this.baseUrl}/list`, {
+        headers: {
+          'X-RapidAPI-Key': this.apiKey,
+          'X-RapidAPI-Host': 'realty-in-us.p.rapidapi.com'
+        },
+        params: {
+          property_id: propertyId
+        }
       });
-    }
 
-    return { id: location.id };
+      if (!response.data?.data?.home_search?.results?.length) {
+        return null;
+      }
+
+      const propertyData = response.data.data.home_search.results[0];
+      return this.transformPropertyData(propertyData);
+    } catch (error) {
+      console.error('Error fetching property:', error);
+      return null;
+    }
   }
 
-  private transformApiProperty(apiProperty: any, locationId: number): Omit<Property, 'id' | 'createdAt' | 'updatedAt'> {
+  private transformPropertyData(data: any): Property {
+    const location = data.location;
+    const propertyId = data.property_id || data.mls_id || data.listing_id;
+    const locationId = `${location.city.toLowerCase()}-${location.state_code.toLowerCase()}`;
+
     return {
+      id: propertyId.toString(),
       locationId,
-      address: apiProperty.address || '',
-      price: parseFloat(apiProperty.price) || 0,
-      bedrooms: apiProperty.beds ? parseInt(apiProperty.beds) : undefined,
-      bathrooms: apiProperty.baths ? parseFloat(apiProperty.baths) : undefined,
-      squareFeet: apiProperty.squareFeet ? parseInt(apiProperty.squareFeet) : undefined,
-      yearBuilt: apiProperty.yearBuilt ? parseInt(apiProperty.yearBuilt) : undefined,
-      propertyType: apiProperty.propertyType,
+      address: `${location.address.line}, ${location.address.city}, ${location.address.state_code} ${location.address.postal_code}`,
+      price: data.list_price,
+      bedrooms: data.description.beds || 0,
+      bathrooms: data.description.baths || 0,
+      squareFeet: data.description.sqft || 0,
+      propertyType: this.mapPropertyType(data.property_type),
       listingSource: 'rapidapi',
-      listingUrl: apiProperty.listingUrl,
+      listingUrl: data.permalink || '',
+      createdAt: new Date(),
+      updatedAt: new Date()
     };
+  }
+
+  private mapPropertyType(apiType: string): 'single_family' | 'multi_family' | 'condo' | 'townhouse' {
+    const typeMap: { [key: string]: 'single_family' | 'multi_family' | 'condo' | 'townhouse' } = {
+      'single_family': 'single_family',
+      'multi_family': 'multi_family',
+      'condo': 'condo',
+      'townhouse': 'townhouse'
+    };
+    return typeMap[apiType.toLowerCase()] || 'single_family';
   }
 } 

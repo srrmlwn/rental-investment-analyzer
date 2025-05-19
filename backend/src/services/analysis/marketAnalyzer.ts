@@ -1,143 +1,134 @@
-import { MarketData, MarketDataType } from '../../models/types';
+// import { MarketData, MarketDataType } from '../../models/types';
 import testData from '../../data/test/marketData.json';
+
+export enum MarketDataType {
+  RENTAL_RATES = 'rental_rate',
+  PROPERTY_VALUES = 'property_value'
+}
+
+export interface MarketData {
+  id: number;
+  locationId: string;
+  dataType: MarketDataType;
+  value: number;
+  year: number;
+  month: number;
+  source: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 export interface MarketMetrics {
   averageRentalRate: number;
   averagePropertyValue: number;
   capRate: number;
-  priceToRentRatio: number;
+  cashOnCashReturn: number;
   rentalYield: number;
-  monthlyTrend: {
-    rentalRateChange: number;
-    propertyValueChange: number;
-  };
-  annualTrend: {
-    rentalRateChange: number;
-    propertyValueChange: number;
-  };
+  priceToRentRatio: number;
+  rentalRateTrend: number;
+  propertyValueTrend: number;
 }
 
 export interface MarketAnalysis {
-  locationId: number;
-  city: string;
-  state: string;
+  locationId: string;
   metrics: MarketMetrics;
-  rentalRates: MarketData[];
-  propertyValues: MarketData[];
   lastUpdated: Date;
 }
 
 export interface MarketAnalyzer {
-  analyzeLocation(locationId: number): Promise<MarketAnalysis>;
+  analyzeLocation(locationId: string): Promise<MarketAnalysis>;
 }
 
 export class StandardMarketAnalyzer implements MarketAnalyzer {
-  private getTestData(locationId: number, dataType: MarketDataType): MarketData[] {
-    const data = dataType === 'rental_rate' ? testData.rentalRates : testData.propertyValues;
-    const locationData = data.find(loc => loc.locationId === locationId);
-    
-    if (!locationData) {
-      throw new Error(`No ${dataType} data found for location ${locationId}`);
-    }
-
-    return locationData.data.map(item => ({
-      id: 0, // Not relevant for test data
-      locationId,
-      dataType,
-      value: item.value,
-      year: item.year,
-      month: item.month,
-      source: 'test_data',
-      createdAt: new Date(),
-      updatedAt: new Date()
-    }));
-  }
-
-  private calculateMarketMetrics(
-    rentalRates: MarketData[],
-    propertyValues: MarketData[]
-  ): MarketMetrics {
-    // Sort data by date (newest first)
-    const sortedRentalRates = [...rentalRates].sort((a, b) => 
-      (b.year * 12 + (b.month || 0)) - (a.year * 12 + (a.month || 0))
-    );
-    const sortedPropertyValues = [...propertyValues].sort((a, b) => 
-      (b.year * 12 + (b.month || 0)) - (a.year * 12 + (a.month || 0))
-    );
-
-    // Calculate averages
-    const averageRentalRate = sortedRentalRates.reduce((sum, data) => sum + data.value, 0) / sortedRentalRates.length;
-    const averagePropertyValue = sortedPropertyValues.reduce((sum, data) => sum + data.value, 0) / sortedPropertyValues.length;
-
-    // Calculate monthly trends (comparing last two months)
-    const monthlyRentalRateChange = sortedRentalRates.length >= 2 
-      ? ((sortedRentalRates[0].value - sortedRentalRates[1].value) / sortedRentalRates[1].value) * 100
-      : 0;
-    const monthlyPropertyValueChange = sortedPropertyValues.length >= 2
-      ? ((sortedPropertyValues[0].value - sortedPropertyValues[1].value) / sortedPropertyValues[1].value) * 100
-      : 0;
-
-    // Calculate annual trends (comparing first and last month in dataset)
-    const annualRentalRateChange = sortedRentalRates.length >= 2
-      ? ((sortedRentalRates[0].value - sortedRentalRates[sortedRentalRates.length - 1].value) / 
-         sortedRentalRates[sortedRentalRates.length - 1].value) * 100
-      : 0;
-    const annualPropertyValueChange = sortedPropertyValues.length >= 2
-      ? ((sortedPropertyValues[0].value - sortedPropertyValues[sortedPropertyValues.length - 1].value) / 
-         sortedPropertyValues[sortedPropertyValues.length - 1].value) * 100
-      : 0;
-
-    // Calculate investment metrics
-    const annualRentalIncome = averageRentalRate * 12;
-    const capRate = (annualRentalIncome / averagePropertyValue) * 100;
-    const priceToRentRatio = averagePropertyValue / (averageRentalRate * 12);
-    const rentalYield = (annualRentalIncome / averagePropertyValue) * 100;
-
-    return {
-      averageRentalRate,
-      averagePropertyValue,
-      capRate,
-      priceToRentRatio,
-      rentalYield,
-      monthlyTrend: {
-        rentalRateChange: monthlyRentalRateChange,
-        propertyValueChange: monthlyPropertyValueChange
-      },
-      annualTrend: {
-        rentalRateChange: annualRentalRateChange,
-        propertyValueChange: annualPropertyValueChange
-      }
-    };
-  }
-
-  async analyzeLocation(locationId: number): Promise<MarketAnalysis> {
+  async analyzeLocation(locationId: string): Promise<MarketAnalysis> {
     try {
       // Get test data for the location
-      const rentalRates = this.getTestData(locationId, 'rental_rate');
-      const propertyValues = this.getTestData(locationId, 'property_value');
-
-      // Get location info from test data
-      const locationInfo = testData.rentalRates.find(loc => loc.locationId === locationId);
-      if (!locationInfo) {
-        throw new Error(`Location ${locationId} not found in test data`);
-      }
+      const rentalRates = this.getTestData(locationId, MarketDataType.RENTAL_RATES);
+      const propertyValues = this.getTestData(locationId, MarketDataType.PROPERTY_VALUES);
 
       // Calculate market metrics
       const metrics = this.calculateMarketMetrics(rentalRates, propertyValues);
 
       return {
         locationId,
-        city: locationInfo.city,
-        state: locationInfo.state,
         metrics,
-        rentalRates,
-        propertyValues,
         lastUpdated: new Date()
       };
     } catch (error: unknown) {
-      console.error('Error analyzing location:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       throw new Error(`Failed to analyze location ${locationId}: ${errorMessage}`);
     }
+  }
+
+  private getTestData(locationId: string, dataType: MarketDataType): MarketData[] {
+    // For MVP, we'll use test data
+    const testData = require('../../data/test/marketData.json');
+    const locationData = testData[locationId];
+    
+    if (!locationData) {
+      throw new Error(`No test data available for location ${locationId}`);
+    }
+
+    return dataType === MarketDataType.RENTAL_RATES 
+      ? locationData.rentalRates 
+      : locationData.propertyValues;
+  }
+
+  private calculateMarketMetrics(rentalRates: MarketData[], propertyValues: MarketData[]): MarketMetrics {
+    const avgRentalRate = this.calculateAverage(rentalRates.map(r => r.value));
+    const avgPropertyValue = this.calculateAverage(propertyValues.map(p => p.value));
+    
+    // Calculate trends (simple linear regression)
+    const rentalRateTrend = this.calculateTrend(rentalRates);
+    const propertyValueTrend = this.calculateTrend(propertyValues);
+
+    // Calculate annual metrics
+    const annualRent = avgRentalRate * 12;
+    const capRate = (annualRent / avgPropertyValue) * 100;
+    const priceToRentRatio = avgPropertyValue / annualRent;
+    const rentalYield = (annualRent / avgPropertyValue) * 100;
+
+    // For MVP, we'll use a simplified cash-on-cash return calculation
+    // assuming 20% down payment and 4% interest rate
+    const downPayment = avgPropertyValue * 0.2;
+    const annualMortgage = (avgPropertyValue - downPayment) * 0.04;
+    const annualExpenses = annualRent * 0.3; // Assuming 30% expenses
+    const annualCashFlow = annualRent - annualMortgage - annualExpenses;
+    const cashOnCashReturn = (annualCashFlow / downPayment) * 100;
+
+    return {
+      averageRentalRate: avgRentalRate,
+      averagePropertyValue: avgPropertyValue,
+      capRate,
+      cashOnCashReturn,
+      rentalYield,
+      priceToRentRatio,
+      rentalRateTrend,
+      propertyValueTrend
+    };
+  }
+
+  private calculateAverage(values: number[]): number {
+    return values.reduce((sum, val) => sum + val, 0) / values.length;
+  }
+
+  private calculateTrend(data: MarketData[]): number {
+    if (data.length < 2) return 0;
+
+    const sortedData = [...data].sort((a, b) => 
+      (a.year * 12 + a.month) - (b.year * 12 + b.month)
+    );
+
+    const x = sortedData.map((_, i) => i);
+    const y = sortedData.map(d => d.value);
+
+    const n = x.length;
+    const sumX = x.reduce((a, b) => a + b, 0);
+    const sumY = y.reduce((a, b) => a + b, 0);
+    const sumXY = x.reduce((sum, xi, i) => sum + xi * y[i], 0);
+    const sumXX = x.reduce((sum, xi) => sum + xi * xi, 0);
+
+    const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
+    return slope; // This represents the monthly change
   }
 } 

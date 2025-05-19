@@ -8,17 +8,16 @@ export interface Location {
 }
 
 export interface Property {
-  id: number;
-  locationId: number;
+  id: string;
+  locationId: string;
   address: string;
   price: number;
-  bedrooms?: number;
-  bathrooms?: number;
-  squareFeet?: number;
-  yearBuilt?: number;
-  propertyType?: string;
+  bedrooms: number;
+  bathrooms: number;
+  squareFeet: number;
+  propertyType: 'single_family' | 'multi_family' | 'condo' | 'townhouse';
   listingSource: string;
-  listingUrl?: string;
+  listingUrl: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,6 +45,15 @@ export interface AnalysisResult {
   inputData: Record<string, any>;
   results: Record<string, any>;
   createdAt: Date;
+}
+
+export interface CashFlowInput {
+  price: number;
+  downPayment: number;
+  interestRate: number;
+  loanTerm: number;
+  rent: number;
+  expenses: number;
 }
 
 // Database row types (snake_case)
@@ -106,17 +114,16 @@ export const toLocation = (row: LocationRow): Location => ({
 });
 
 export const toProperty = (row: PropertyRow): Property => ({
-  id: row.id,
-  locationId: row.location_id,
+  id: row.id.toString(),
+  locationId: row.location_id.toString(),
   address: row.address,
   price: row.price,
-  bedrooms: row.bedrooms,
-  bathrooms: row.bathrooms,
-  squareFeet: row.square_feet,
-  yearBuilt: row.year_built,
-  propertyType: row.property_type,
+  bedrooms: row.bedrooms || 0,
+  bathrooms: row.bathrooms || 0,
+  squareFeet: row.square_feet || 0,
+  propertyType: row.property_type as 'single_family' | 'multi_family' | 'condo' | 'townhouse' || 'single_family',
   listingSource: row.listing_source,
-  listingUrl: row.listing_url,
+  listingUrl: row.listing_url || '',
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
