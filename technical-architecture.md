@@ -3,7 +3,7 @@
 ## 1. System Overview
 
 ### 1.1 Architecture Goals
-- Support real-time property listing data with static market data
+- Support real-time property listing data with test market data (MVP)
 - Enable scalable analysis of multiple locations
 - Provide reliable and accurate financial calculations
 - Support future API integrations and feature additions
@@ -13,16 +13,16 @@
 ```
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │                 │     │                 │     │                 │
-│  Web Frontend   │◄────┤  Backend API    │◄────┤  Data Services  │
-│                 │     │                 │     │                 │
+│  Web Frontend   │◄────┤  Backend API    │◄────┤  External APIs  │
+│  (Next.js)      │     │  (Express)      │     │  (RapidAPI)     │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
         ▲                       ▲                       ▲
         │                       │                       │
         ▼                       ▼                       ▼
 ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
 │                 │     │                 │     │                 │
-│  Static Assets  │     │  Cache Layer    │     │  External APIs  │
-│                 │     │                 │     │                 │
+│  Static Assets  │     │  Test Data      │     │  Market Data    │
+│                 │     │  (JSON)         │     │  (JSON)         │
 └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
@@ -76,178 +76,221 @@ src/
 #### Technology Stack
 - Node.js with Express
 - TypeScript
-- PostgreSQL for primary database
-- Redis for caching
-- Bull for job queues
+- In-memory data storage (MVP)
+- Jest for testing
+- Express Validator for input validation
 
 #### API Structure
 ```
 /api
-├── v1/
-│   ├── locations/
-│   │   ├── GET /search
-│   │   └── GET /:id/properties
-│   ├── properties/
-│   │   ├── GET /search
-│   │   └── GET /:id/analysis
-│   ├── market-data/
-│   │   ├── GET /rental-rates
-│   │   └── GET /market-averages
-│   └── reports/
-│       ├── POST /generate
-│       └── GET /:id
+├── health
+│   └── GET /api/health
+└── analysis
+    └── POST /api/analysis
+        Request:
+        {
+          propertyId: string;
+          analysisParams: {
+            downPayment: number;
+            interestRate: number;
+            loanTerm: number;
+            operatingExpenses: {
+              propertyTax?: number;
+              insurance?: number;
+              hoa?: number;
+              maintenance?: number;
+              utilities?: number;
+              propertyManagement?: number;
+            }
+          }
+        }
+        Response:
+        {
+          property: Property;
+          marketAnalysis: MarketAnalysis;
+          cashFlow: CashFlowResult;
+        }
 ```
 
-### 2.3 Data Services
-#### Database Schema
-```sql
--- Core Tables
-CREATE TABLE locations (
-    id SERIAL PRIMARY KEY,
-    city VARCHAR(100),
-    state VARCHAR(2),
-    zip_code VARCHAR(10),
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
-);
+#### Core Services
+1. Property Listing Service
+   - Integration with RapidAPI
+   - Property search and filtering
+   - Property details retrieval
+   - Data transformation and normalization
 
-CREATE TABLE properties (
-    id SERIAL PRIMARY KEY,
-    location_id INTEGER REFERENCES locations(id),
-    listing_price DECIMAL,
-    property_type VARCHAR(50),
-    details JSONB,
-    source_id VARCHAR(100),
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP
-);
+2. Market Analysis Service
+   - Test data integration (MVP)
+   - Market metrics calculation
+   - Trend analysis
+   - Location-based analysis
 
-CREATE TABLE market_data (
-    id SERIAL PRIMARY KEY,
-    location_id INTEGER REFERENCES locations(id),
-    data_type VARCHAR(50),
-    data JSONB,
-    valid_from TIMESTAMP,
-    valid_to TIMESTAMP,
-    created_at TIMESTAMP
-);
+3. Cash Flow Calculator
+   - Monthly and annual calculations
+   - Cash-on-cash return
+   - Expense management
+   - Investment metrics
 
-CREATE TABLE analysis_results (
-    id SERIAL PRIMARY KEY,
-    location_id INTEGER REFERENCES locations(id),
-    analysis_type VARCHAR(50),
-    results JSONB,
-    created_at TIMESTAMP
-);
-```
+### 2.3 Data Management
 
-#### Data Flow
-1. Property Listings
-   - Real-time API integration
-   - Periodic sync with external sources
-   - Cache in Redis for quick access
-   - Store in PostgreSQL for persistence
-
-2. Market Data
-   - Static file imports (monthly)
-   - Cache in Redis
-   - Store in PostgreSQL
-   - Future: Real-time API integration
-
-3. Analysis Results
-   - Generated on-demand
-   - Cached in Redis
-   - Stored in PostgreSQL
-   - PDF generation via queue
-
-### 2.4 External Services Integration
-#### Property Listing APIs (P0)
-- Integration with MLS APIs
-- Rate limiting and caching
-- Error handling and fallbacks
-- Data normalization
-
-#### Market Data APIs (P1)
-- Rental market APIs
-- Real estate market APIs
-- Economic indicators APIs
-- Data aggregation and normalization
-
-## 3. Data Management
-
-### 3.1 Static Data Management
-#### File Structure
+#### Test Data Structure
 ```
 data/
-├── rental-rates/
-│   ├── by-zipcode.json
-│   └── by-property-type.json
-├── market-averages/
-│   ├── by-city.json
-│   └── by-zipcode.json
-└── operating-expenses/
-    ├── tax-rates.json
-    └── expense-ratios.json
+└── test/
+    └── marketData.json
+        {
+          "san-francisco-ca": {
+            "rentalRates": [...],
+            "propertyValues": [...]
+          },
+          "oakland-ca": {
+            "rentalRates": [...],
+            "propertyValues": [...]
+          }
+        }
 ```
 
-#### Update Process
-1. Monthly data updates
-2. Validation scripts
-3. Database import
-4. Cache invalidation
-5. Version control
+#### Data Types
+```typescript
+interface Property {
+  id: string;
+  locationId: string;
+  address: string;
+  price: number;
+  bedrooms: number;
+  bathrooms: number;
+  squareFeet: number;
+  propertyType: 'single_family' | 'multi_family' | 'condo' | 'townhouse';
+  listingSource: string;
+  listingUrl: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
-### 3.2 Caching Strategy
-- Redis for:
-  - Property listings (5-minute TTL)
-  - Market data (24-hour TTL)
-  - Analysis results (1-hour TTL)
-- Cache invalidation on:
-  - Data updates
-  - Analysis generation
-  - User actions
+interface MarketAnalysis {
+  locationId: string;
+  metrics: {
+    averageRentalRate: number;
+    averagePropertyValue: number;
+    capRate: number;
+    cashOnCashReturn: number;
+    rentalYield: number;
+    priceToRentRatio: number;
+    rentalRateTrend: number;
+    propertyValueTrend: number;
+  };
+  lastUpdated: Date;
+}
+
+interface CashFlowResult {
+  monthlyPayment: number;
+  monthlyCashFlow: number;
+  annualCashFlow: number;
+  cashOnCashReturn: number;
+}
+```
+
+### 2.4 Error Handling
+#### Error Types
+```typescript
+enum ErrorCodes {
+  PROPERTY_NOT_FOUND = 'PROPERTY_NOT_FOUND',
+  INVALID_INPUT = 'INVALID_INPUT',
+  INTERNAL_ERROR = 'INTERNAL_ERROR'
+}
+
+class ApiError extends Error {
+  constructor(
+    public statusCode: number,
+    public code: ErrorCodes,
+    message: string
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+```
+
+#### Error Response Format
+```json
+{
+  "error": {
+    "code": "PROPERTY_NOT_FOUND",
+    "message": "Property with ID 123 not found"
+  }
+}
+```
+
+## 3. Testing Strategy
+
+### 3.1 Unit Tests
+- Market Analyzer tests
+  - Location analysis
+  - Metric calculations
+  - Error handling
+- Cash Flow Calculator tests
+  - Monthly and annual calculations
+  - Edge cases
+  - Input validation
+
+### 3.2 Integration Tests
+- API endpoint tests
+  - Analysis endpoint
+  - Input validation
+  - Error responses
+- Property listing service tests
+  - Property search
+  - Property details
+  - Error handling
 
 ## 4. Security
 
-### 4.1 Authentication & Authorization
-- JWT-based authentication
-- Role-based access control
-- API key management
-- Rate limiting
+### 4.1 API Security
+- Input validation using express-validator
+- Error handling middleware
+- CORS configuration
+- Helmet for security headers
 
 ### 4.2 Data Security
 - HTTPS everywhere
-- Data encryption at rest
 - Secure API key storage
-- Input validation
-- SQL injection prevention
+- Input sanitization
+- Rate limiting (future)
 
 ## 5. Deployment & Infrastructure
 
 ### 5.1 Infrastructure (MVP)
-- AWS or similar cloud provider
-- Docker containers
-- Kubernetes for orchestration
-- CI/CD pipeline
+- Node.js runtime
+- Express server
+- Environment-based configuration
+- Health check endpoint
 
 ### 5.2 Monitoring & Logging
-- Application metrics
-- Error tracking
-- Performance monitoring
-- Usage analytics
+- Error logging
+- Request logging
+- Performance monitoring (future)
+- Usage analytics (future)
 
 ## 6. Evolution Path
 
-### 6.1 P0 to P1 Transition
-1. API Integration
-   - Add new API endpoints
-   - Implement real-time data fetching
-   - Update caching strategy
+### 6.1 MVP to P1 Transition
+1. Database Integration
+   - Add PostgreSQL database
+   - Implement data models
+   - Add data persistence
+   - Migrate from test data
 
-2. Enhanced Analysis
-   - Add new financial metrics
-   - Implement comparison features
-   - Enhance reporting
+2. Enhanced Features
+   - User authentication
+   - Saved analyses
+   - Historical data tracking
+   - Advanced market metrics
+
+3. Performance Optimization
+   - Add Redis caching
+   - Implement rate limiting
+   - Add request queuing
+   - Optimize data queries
 
 ### 6.2 P1 to P2 Transition
 1. Advanced Features
