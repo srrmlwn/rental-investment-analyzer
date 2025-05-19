@@ -1,0 +1,149 @@
+{
+  "project": {
+    "name": "rental-investment-analyzer",
+    "description": "A comprehensive web application for analyzing potential rental property investments",
+    "type": "monorepo",
+    "workspaces": ["frontend", "backend"]
+  },
+  "techStack": {
+    "frontend": {
+      "framework": "Next.js 15.3.2",
+      "language": "TypeScript",
+      "styling": "Tailwind CSS",
+      "stateManagement": "@tanstack/react-query",
+      "testing": ["Jest", "React Testing Library"]
+    },
+    "backend": {
+      "framework": "Express",
+      "language": "TypeScript",
+      "database": "PostgreSQL",
+      "testing": "Jest"
+    }
+  },
+  "development": {
+    "ports": {
+      "frontend": 3000,
+      "backend": 3001
+    },
+    "databases": {
+      "main": "rental_analyzer",
+      "test": "rental_analyzer_test"
+    },
+    "scripts": {
+      "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+      "test": "npm run test --workspaces",
+      "lint": "npm run lint --workspaces",
+      "build": "npm run build --workspaces"
+    }
+  },
+  "rules": {
+    "codeStyle": {
+      "typescript": {
+        "strict": true,
+        "target": "es2020",
+        "moduleResolution": "node"
+      },
+      "formatting": {
+        "semicolons": true,
+        "singleQuote": true,
+        "printWidth": 80,
+        "trailingComma": "es5"
+      }
+    },
+    "testing": {
+      "coverage": {
+        "statements": 80,
+        "branches": 80,
+        "functions": 80,
+        "lines": 80
+      },
+      "frontend": {
+        "componentTests": true,
+        "integrationTests": true,
+        "e2eTests": "future"
+      },
+      "backend": {
+        "unitTests": true,
+        "integrationTests": true,
+        "apiTests": true
+      }
+    },
+    "documentation": {
+      "required": [
+        "README.md",
+        "API documentation",
+        "Component documentation",
+        "Database schema"
+      ],
+      "style": "markdown"
+    },
+    "git": {
+      "branchNaming": "feature/|bugfix/|hotfix/|release/",
+      "commitConvention": "conventional",
+      "protectedBranches": ["main"]
+    }
+  },
+  "context": {
+    "currentPhase": "Phase 0 completed",
+    "nextPhase": "Phase 1 - Core Backend Implementation",
+    "recentChanges": [
+      "Initial project setup",
+      "Documentation created",
+      "Frontend and backend basic structure",
+      "Development environment configured"
+    ],
+    "keyFiles": {
+      "documentation": [
+        "README.md",
+        "docs/api.md",
+        "tasks/phase-0-setup.md",
+        "tasks/phase-1-backend.md",
+        "tasks/phase-2-frontend.md"
+      ],
+      "configuration": [
+        "package.json",
+        "backend/tsconfig.json",
+        "frontend/tsconfig.json",
+        ".gitignore",
+        ".cursorrc"
+      ],
+      "source": {
+        "frontend": [
+          "frontend/src/app/layout.tsx",
+          "frontend/src/app/page.tsx",
+          "frontend/src/components/ui/Button.tsx"
+        ],
+        "backend": [
+          "backend/src/index.ts",
+          "backend/src/config/database.ts"
+        ]
+      }
+    },
+    "environment": {
+      "required": {
+        "node": ">=18",
+        "postgres": ">=14",
+        "npm": "latest"
+      },
+      "files": {
+        "backend": ".env",
+        "frontend": ".env.local"
+      }
+    }
+  },
+  "autoLoad": {
+    "enabled": true,
+    "contextFiles": [
+      "README.md",
+      "docs/api.md",
+      "tasks/phase-0-setup.md",
+      "tasks/phase-1-backend.md",
+      "tasks/phase-2-frontend.md"
+    ],
+    "rules": {
+      "enforceConventions": true,
+      "validateSetup": true,
+      "checkDependencies": true
+    }
+  }
+} 
