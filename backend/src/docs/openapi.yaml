@@ -1,0 +1,244 @@
+openapi: 3.0.0
+info:
+  title: Rental Property Investment Analyzer API
+  version: 1.0.0
+  description: API for analyzing rental property investments, calculating cash flows, and market metrics
+
+servers:
+  - url: http://localhost:3001/api/v1
+    description: Local development server
+
+components:
+  schemas:
+    Property:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique identifier for the property
+        locationId:
+          type: integer
+          description: ID of the location where the property is located
+        address:
+          type: string
+          description: Property address
+        price:
+          type: number
+          description: Property price in USD
+        bedrooms:
+          type: integer
+          description: Number of bedrooms
+        bathrooms:
+          type: number
+          description: Number of bathrooms
+        squareFeet:
+          type: integer
+          description: Property size in square feet
+        propertyType:
+          type: string
+          enum: [single_family, multi_family, condo, townhouse]
+          description: Type of property
+        listingSource:
+          type: string
+          description: Source of the property listing
+        listingUrl:
+          type: string
+          description: URL to the original listing
+
+    MarketAnalysis:
+      type: object
+      properties:
+        locationId:
+          type: integer
+          description: ID of the analyzed location
+        city:
+          type: string
+          description: City name
+        state:
+          type: string
+          description: State code
+        metrics:
+          type: object
+          properties:
+            averageRentalRate:
+              type: number
+              description: Average monthly rental rate
+            averagePropertyValue:
+              type: number
+              description: Average property value
+            capRate:
+              type: number
+              description: Capitalization rate (annual rental income / property value)
+            priceToRentRatio:
+              type: number
+              description: Property value / annual rental income
+            rentalYield:
+              type: number
+              description: Annual rental income / property value
+            monthlyTrend:
+              type: object
+              properties:
+                rentalRateChange:
+                  type: number
+                  description: Month-over-month rental rate change percentage
+                propertyValueChange:
+                  type: number
+                  description: Month-over-month property value change percentage
+            annualTrend:
+              type: object
+              properties:
+                rentalRateChange:
+                  type: number
+                  description: Year-over-year rental rate change percentage
+                propertyValueChange:
+                  type: number
+                  description: Year-over-year property value change percentage
+
+    CashFlowAnalysis:
+      type: object
+      properties:
+        monthlyCashFlow:
+          type: number
+          description: Monthly cash flow (rental income - expenses - mortgage)
+        annualCashFlow:
+          type: number
+          description: Annual cash flow
+        cashOnCashReturn:
+          type: number
+          description: Cash-on-cash return percentage
+
+    AnalysisRequest:
+      type: object
+      required:
+        - propertyId
+        - analysisParams
+      properties:
+        propertyId:
+          type: integer
+          description: ID of the property to analyze
+        analysisParams:
+          type: object
+          required:
+            - downPayment
+            - interestRate
+            - loanTerm
+            - operatingExpenses
+          properties:
+            downPayment:
+              type: number
+              description: Down payment amount in USD
+            interestRate:
+              type: number
+              description: Annual interest rate percentage
+            loanTerm:
+              type: integer
+              description: Loan term in years
+            operatingExpenses:
+              type: object
+              required:
+                - propertyTax
+                - insurance
+                - maintenance
+                - management
+                - vacancy
+              properties:
+                propertyTax:
+                  type: number
+                  description: Annual property tax
+                insurance:
+                  type: number
+                  description: Annual insurance cost
+                maintenance:
+                  type: number
+                  description: Annual maintenance cost
+                management:
+                  type: number
+                  description: Annual property management cost
+                hoa:
+                  type: number
+                  description: Annual HOA fees
+                utilities:
+                  type: number
+                  description: Annual utilities cost
+                vacancy:
+                  type: number
+                  description: Annual vacancy cost
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+          description: Error message
+        code:
+          type: string
+          description: Error code
+        details:
+          type: object
+          description: Additional error details
+
+paths:
+  /analysis/calculate:
+    post:
+      summary: Calculate investment analysis for a property
+      description: Analyzes a property's investment potential by calculating cash flow and market metrics
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisRequest'
+      responses:
+        '200':
+          description: Analysis results
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  property:
+                    $ref: '#/components/schemas/Property'
+                  marketAnalysis:
+                    $ref: '#/components/schemas/MarketAnalysis'
+                  cashFlow:
+                    $ref: '#/components/schemas/CashFlowAnalysis'
+        '400':
+          description: Invalid request parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: Property not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /health:
+    get:
+      summary: Health check endpoint
+      description: Returns the health status of the API and database
+      responses:
+        '200':
+          description: Health status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  timestamp:
+                    type: string
+                    format: date-time
+                  database:
+                    type: string
+                    enum: [connected, disconnected] 
